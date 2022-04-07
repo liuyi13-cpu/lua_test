@@ -1,0 +1,65 @@
+require("class")
+require("hotfix_util")
+
+------------------------------------------------------------------------------------------------
+---数据表
+ResData = {}
+ResData[1000] = "aaaa"
+
+------------------------------------------------------------------------------------------------
+---全局函数
+local count = 0
+function global_fun()
+    count = count + 1
+    print("global_fun " .. count)
+end
+function call_global_fun()
+    print("call_global_fun")
+    global_fun()
+end
+
+------------------------------------------------------------------------------------------------
+---local函数
+local function local_fun()
+    print("local_fun")
+end
+
+function call_local_fun()
+    local_fun()
+    print("call_local_fun")
+end
+
+------------------------------------------------------------------------------------------------
+---闭包函数 = 内嵌函数+upvalue
+---主要用来保存外层函数的local变量，作用等同于类的成员变量
+function closure_fun()
+    local index = 0
+    print("closure_fun")
+    return function()
+        index = index + 1
+        print("closure_fun "..index)
+    end
+end
+
+function call_closure_fun()
+    local func = closure_fun()
+    func()
+end
+
+------------------------------------------------------------------------------------------------
+---class函数
+---@class Actor
+Actor = class("Actor")
+function Actor:destroy()
+    print("Actor:destroy")
+end
+
+function Actor:print()
+    print("Actor:print")
+end
+
+---@class Hero : Actor
+Hero = class("Hero", Actor)
+function Hero:destroy()
+    print("Hero:destroy")
+end

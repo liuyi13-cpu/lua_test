@@ -1,0 +1,59 @@
+hotfix = {}
+---@deprecated
+function hotfix.get_upvalue_index(fun, upvalue_name)
+    local index = 1
+    while(true)
+    do
+        local name, _ = debug.getupvalue(fun, index)
+        if name == nil then
+            return -1
+        end
+        if name == upvalue_name then
+            return index
+        end
+        index = index + 1
+    end
+    return -1
+end
+
+---@public
+---绑定函数的同名upvalue
+--TODO 待完善
+function hotfix.update_upvalue(func, hotfix_func)
+    local old_upvalue_map = {}
+    local exist = false
+    for i = 1, math.huge do
+        local name, value = debug.getupvalue(func, i)
+        if name == nil then
+            break
+        end
+        old_upvalue_map[name] = {index = i, value = value}
+        exist = true
+    end
+    if not exist then
+        return
+    end
+    
+    for i = 1, math.huge do
+        local name, value = debug.getupvalue(hotfix_func, i)
+        if name == nil then
+            break
+        end
+        local old = old_upvalue_map[name]
+        if old then
+            local old_type = type(old.value)
+            if type(value) == old_type then
+                if old_type == 'table' then
+                    error("update_upvalue 不支持table类型的upvalue")
+                else
+                    debug.upvaluejoin(hotfix_func, i, func, old.index)
+                end
+                if old_type == 'function' then
+                    hotfix.update_upvalue(old.value, value)
+                end
+            else
+               error("update_upvalue 类型不一样", old.type, type(value)) 
+            end
+        end
+    end
+end

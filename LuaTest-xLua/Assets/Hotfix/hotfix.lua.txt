@@ -1,0 +1,117 @@
+-- hotfix
+local TEST_DATA = false
+local TEST_GLOBAL = false
+local TEST_LOCAL_FUN = false
+local TEST_COLSURE_FUN = false
+local TEST_CLASS_FUN = true
+
+------------------------------------------------------------------------------------------------
+-- 替换数据
+local function ReplaceData()
+    if TEST_DATA then
+        print(ResData[1000])
+        ResData[1000] = "hotfix"
+        print(ResData[1000])
+    end
+end
+
+------------------------------------------------------------------------------------------------
+---全局函数
+---和global_fun里的count是独立的值，可以通过upvaluejoin绑定
+---print也是upvalue
+local count_fix = 0
+local function global_fun_hotfix()
+    count_fix = count_fix + 10
+    print("global_fun_hotfix "..count_fix)
+end
+
+------------------------------------------------------------------------------------------------
+---local函数
+local function local_fun_hotfix()
+    print("local_fun_hotfix")
+end
+local function call_local_fun_hotfix()
+    local_fun_hotfix()
+    print("call_local_fun_hotfix")
+end
+
+------------------------------------------------------------------------------------------------
+---闭包函数
+function call_closure_fun_hotfix()
+    local index_hotfix = 0
+    print("call_closure_fun_hotfix")
+    return function()
+        index_hotfix = index_hotfix + 10
+        print("call_closure_fun_hotfix "..index_hotfix)
+    end
+end
+
+------------------------------------------------------------------------------------------------
+---@param self Hero
+local function Hero_destroy(self)
+    print("WorldEntity_destroy ")
+    self:print()
+end
+
+------------------------------------------------------------------------------------------------
+-- 替换函数
+local function ReplaceFunc()
+    ---1 local变量 + 全局函数
+    do
+        if TEST_GLOBAL then
+            global_fun()
+            local upvalue_index = hotfix_util.get_upvalue_index(global_fun, "count")
+            local upvalue_index_hotfix = hotfix_util.get_upvalue_index(global_fun_hotfix, "count_fix")
+            debug.upvaluejoin(global_fun_hotfix, upvalue_index_hotfix, global_fun, upvalue_index)
+            global_fun = global_fun_hotfix
+            call_global_fun()
+        end
+    end
+    
+    ---2 局部函数
+    do
+        if TEST_LOCAL_FUN then
+            call_local_fun()
+            local upvalue_index = hotfix_util.get_upvalue_index(call_local_fun, "local_fun")
+            local upvalue_index_hotfix = hotfix_util.get_upvalue_index(call_local_fun_hotfix, "local_fun_hotfix")
+            debug.upvaluejoin(call_local_fun, upvalue_index, call_local_fun_hotfix, upvalue_index_hotfix)
+            call_local_fun()
+        end
+    end
+
+    ---3 闭包函数
+    do
+        if TEST_COLSURE_FUN then
+            local func = closure_fun()
+            func() --1
+            func() --2
+            
+            local func1 = call_closure_fun_hotfix()
+            --绑定upvalue index
+            local upvalue_index = hotfix_util.get_upvalue_index(func, "index")
+            local upvalue_index_hotfix = hotfix_util.get_upvalue_index(func1, "index_hotfix")
+            debug.upvaluejoin(func1, upvalue_index_hotfix, func, upvalue_index)
+            func() --3
+            func() --4
+            func1()--14
+            func1()--24
+            
+            --替换整个闭包函数
+            closure_fun = call_closure_fun_hotfix
+            call_closure_fun() --10
+        end
+    end
+    
+    ---4 类函数
+    do
+        if TEST_CLASS_FUN then
+            local hero = Hero.new()
+            hero:destroy()
+            HotfixClassFunction(Hero, "destroy", Hero_destroy)
+            hero:destroy()
+        end
+    end
+end
+
+ReplaceData()
+ReplaceFunc()

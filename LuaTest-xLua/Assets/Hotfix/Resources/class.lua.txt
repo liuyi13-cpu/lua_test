@@ -1,0 +1,90 @@
+-- 类的继承关系数据，用于处理Hotfix等逻辑。
+-- 数据形式：key为ClassType，value为继承自它的子类列表。
+local __InheritRelationship = {}
+
+local _class={}
+function class(name, super)
+	assert(name and type(name) == 'string', 'class类需要name')
+	local class_type={}
+	class_type.name=name
+	class_type.ctor=false
+	class_type.super=super
+	class_type.new=function(...)
+		local obj={class=class_type}
+		do
+			local create
+			create = function(c,...)
+				if c.super then
+					create(c.super,...)
+				end
+				if c.ctor then
+					c.ctor(obj,...)
+				end
+			end
+
+			create(class_type,...)
+		end
+		setmetatable(obj,{ __index=_class[class_type] })
+		return obj
+	end
+	local vtbl={}
+	_class[class_type]=vtbl
+
+	if super then
+		setmetatable(vtbl,{
+			__index=function(t,k)
+				local ret=_class[super][k]
+				vtbl[k]=ret
+				return ret
+			end
+		})
+		class_type.base=_class[super]
+
+		if not __InheritRelationship[class_type.base] then
+			__InheritRelationship[class_type.base] = {}
+		end
+		table.insert(__InheritRelationship[class_type.base], class_type)
+	end
+
+	setmetatable(class_type,{
+		__newindex=function(t,k,v)
+			vtbl[k]=v
+		end
+	})
+	return class_type
+end
+
+local function __getInheritChildren(classType, output)
+	if output[classType] then
+		return
+	else
+		output[classType] = true
+		if __InheritRelationship[classType] then
+			for _, childType in pairs(__InheritRelationship[classType]) do
+				__getInheritChildren(childType, output)
+			end
+		end
+	end
+end
+
+function HotfixClassFunction(class_type, func, hotfix_func)
+	local classVtbl = _class[class_type]
+	if classVtbl and func and hotfix_func then
+		local preFunc = classVtbl[func]
+		classVtbl[func] = hotfix_func
+		local children = {}
+		__getInheritChildren(class_type, children)
+		for replaceClass, _ in pairs(children) do
+			local vtbl = _class[replaceClass]
+			if rawget(vtbl, func) == preFunc then
+				vtbl[func] = hotfix_func
+			end
+			if replaceClass ~= class_type then
+				local super = replaceClass.super
+				if rawget(super, func) == preFunc then
+					super[func] = hotfix_func
+				end
+			end
+		end
+	end
+end
